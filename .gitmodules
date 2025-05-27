@@ -1,0 +1,3 @@
+[submodule "SkinGPT-4"]
+	path = SkinGPT-4
+	url = https://github.com/JoshuaChou2018/SkinGPT-4.git
