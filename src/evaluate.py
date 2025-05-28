@@ -98,7 +98,7 @@ def main():
             'prompt_path': os.path.join(skingpt_dir, "prompts/alignment_skin.txt"),
             'prompt_template': '###Human: {} ###Assistant: ',
             'ckpt': os.path.join(skingpt_dir, "weights/skingpt4_llama2_13bchat_base_pretrain_stage2.pth"),
-            'llm_model_path': os.path.join(skingpt_dir, "weights/Llama-2-13b-chat-hf"),  # Local path to Llama model
+            'llm_model': "meta-llama/Llama-2-13b-chat-hf",  # Use Hugging Face model ID
             'low_resource': False,  # Don't use 8-bit quantization
             'device_8bit': 0,  # Not used when low_resource is False
             'use_fast': False,  # Use slow tokenizer for compatibility
