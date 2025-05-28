@@ -65,7 +65,7 @@ class SkinGPTEvaluator:
             print(f"Error evaluating image {image_path}: {e}")
             return None
     
-    def evaluate_dataset(self, dataset_path, metadata_path, num_samples=None):
+    def evaluate_dataset(self, dataset_path, metadata_path, num_samples=None, image_column='image_id'):
         """Evaluate model on a dataset."""
         # Load metadata
         df = pd.read_csv(metadata_path)
@@ -74,11 +74,16 @@ class SkinGPTEvaluator:
         
         results = []
         for _, row in tqdm(df.iterrows(), total=len(df)):
-            image_path = os.path.join(dataset_path, row['image'])
+            # Add .jpg extension if not present
+            image_id = row[image_column]
+            if not image_id.endswith('.jpg'):
+                image_id = f"{image_id}.jpg"
+            
+            image_path = os.path.join(dataset_path, image_id)
             prediction = self.evaluate_image(image_path)
             
             results.append({
-                'image': row['image'],
+                'image': image_id,
                 'true_label': row['dx'],
                 'prediction': prediction
             })
@@ -147,7 +152,8 @@ def main():
     ham10000_results = evaluator.evaluate_dataset(
         os.path.join(os.path.dirname(current_dir), "data/ham10000/images"),
         os.path.join(os.path.dirname(current_dir), "data/ham10000/HAM10000_metadata.csv"),
-        num_samples=100  # Start with a small sample for testing
+        num_samples=100,  # Start with a small sample for testing
+        image_column='image_id'  # Use image_id column for HAM10000
     )
     
     # Save HAM10000 results
@@ -160,7 +166,8 @@ def main():
     scin_results = evaluator.evaluate_dataset(
         os.path.join(os.path.dirname(current_dir), "data/scin/images"),
         os.path.join(os.path.dirname(current_dir), "data/scin/scin_merged.csv"),
-        num_samples=100  # Start with a small sample for testing
+        num_samples=100,  # Start with a small sample for testing
+        image_column='image'  # Use image column for SCIN
     )
     
     # Save SCIN results
