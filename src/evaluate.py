@@ -167,7 +167,7 @@ def main():
         os.path.join(os.path.dirname(current_dir), "data/scin/images"),
         os.path.join(os.path.dirname(current_dir), "data/scin/scin_merged.csv"),
         num_samples=100,  # Start with a small sample for testing
-        image_column='image'  # Use image column for SCIN
+        image_column='image_1_path'  # Use the correct column for SCIN
     )
     
     # Save SCIN results
