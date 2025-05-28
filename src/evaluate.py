@@ -98,7 +98,7 @@ def main():
             'prompt_path': os.path.join(skingpt_dir, "prompts/alignment_skin.txt"),
             'prompt_template': '###Human: {} ###Assistant: ',
             'ckpt': os.path.join(skingpt_dir, "weights/skingpt4_llama2_13bchat_base_pretrain_stage2.pth"),
-            'llm_model_path': os.path.join(skingpt_dir, "weights/Llama-2-13b-chat-hf")  # Local path to Llama model
+            'llm_model_path': "meta-llama/Llama-2-13b-chat-hf"  # Use Hugging Face model ID directly
         },
         'datasets': {
             'cc_sbu_align': {
