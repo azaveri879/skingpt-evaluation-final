@@ -84,7 +84,7 @@ class SkinGPTEvaluator:
             
             results.append({
                 'image': image_id,
-                'true_label': row['dermatologist_skin_condition_on_label_name'],
+                'true_label': row[label_column],
                 'prediction': prediction
             })
         
@@ -152,8 +152,9 @@ def main():
     ham10000_results = evaluator.evaluate_dataset(
         os.path.join(os.path.dirname(current_dir), "data/ham10000/images"),
         os.path.join(os.path.dirname(current_dir), "data/ham10000/HAM10000_metadata.csv"),
-        num_samples=100,  # Start with a small sample for testing
-        image_column='image_id'  # Use image_id column for HAM10000
+        num_samples=100,
+        image_column='image_id',
+        label_column='dx'
     )
     
     # Save HAM10000 results
