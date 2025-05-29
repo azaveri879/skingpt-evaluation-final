@@ -222,13 +222,21 @@ def main():
     label_map = {
         'melanoma': 'mel',
         'melanocytic nevi': 'nv',
+        'nevus': 'nv',
+        'mole': 'nv',
         'benign keratosis': 'bkl',
+        'keratosis': 'bkl',
+        'seborrheic keratosis': 'bkl',
         'basal cell carcinoma': 'bcc',
+        'bcc': 'bcc',
         'actinic keratoses': 'akiec',
         'intraepithelial carcinoma': 'akiec',
         'dermatofibroma': 'df',
+        'fibroma': 'df',
         'vascular lesion': 'vasc',
-        # add more as needed
+        'angioma': 'vasc',
+        'hemangioma': 'vasc',
+        # add more as you see in your predictions
     }
 
     def extract_predicted_class(text):
@@ -303,6 +311,8 @@ def main():
     print("Number of known classes:", len(known_classes))
 
     print(ham_df[['prediction', 'predicted_class', 'true_classes']].head(20))
+
+    print(ham_df[ham_df['predicted_class'].isnull()][['prediction']].head(20))
 
 if __name__ == "__main__":
     main() 
