@@ -7,6 +7,9 @@ from tqdm import tqdm
 import torch
 from PIL import Image
 import glob
+import re
+import ast
+from sklearn.metrics import classification_report
 
 # Add SkinGPT-4 directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -93,6 +96,25 @@ class SkinGPTEvaluator:
         
         return results
 
+def extract_predicted_class(text):
+    # Lowercase and look for known classes in the text
+    known_classes = ['urticaria', 'allergic contact dermatitis', 'insect bite', 'erythema nodosum', 'hypersensitivity']  # add all possible classes
+    text = text.lower()
+    for cls in known_classes:
+        if cls in text:
+            return cls
+    return None
+
+def extract_true_classes(label_str):
+    try:
+        labels = ast.literal_eval(label_str)
+        return set([l.lower() for l in labels])
+    except:
+        return set()
+
+def is_correct(row):
+    return row['predicted_class'] in row['true_classes']
+
 def main():
     # Create configuration
     config = {
@@ -150,20 +172,25 @@ def main():
     results_dir = os.path.join(os.path.dirname(current_dir), "results")
     os.makedirs(results_dir, exist_ok=True)
     
-    # # Evaluate HAM10000 dataset
-    # print("Evaluating HAM10000 dataset...")
-    # ham10000_results = evaluator.evaluate_dataset(
-    #     os.path.join(os.path.dirname(current_dir), "data/ham10000/images"),
-    #     os.path.join(os.path.dirname(current_dir), "data/ham10000/HAM10000_metadata.csv"),
-    #     num_samples=100,
-    #     image_column='image_id',
-    #     label_column='dx'
-    # )
+    # Evaluate HAM10000 dataset
+    print("Evaluating HAM10000 dataset...")
+    ham10000_results = evaluator.evaluate_dataset(
+        os.path.join(os.path.dirname(current_dir), "data/ham10000/images"),
+        os.path.join(os.path.dirname(current_dir), "data/ham10000/HAM10000_metadata.csv"),
+        num_samples=100,
+        image_column='image_id',
+        label_column='dx'
+    )
     
-    # # Save HAM10000 results
-    # ham_df = pd.DataFrame(ham10000_results)
-    # ham_df.to_csv(os.path.join(results_dir, "ham10000_results.csv"), index=False)
-    # print(f"Saved HAM10000 results to {os.path.join(results_dir, 'ham10000_results.csv')}")
+    # Save HAM10000 results
+    ham_df = pd.DataFrame(ham10000_results)
+    ham_df['predicted_class'] = ham_df['prediction'].apply(extract_predicted_class)
+    ham_df['true_classes'] = ham_df['true_label'].apply(extract_true_classes)
+    ham_df['correct'] = ham_df.apply(is_correct, axis=1)
+    accuracy = ham_df['correct'].mean()
+    print(f"Adjusted Accuracy: {accuracy:.2%}")
+    ham_df.to_csv(os.path.join(results_dir, "ham10000_results.csv"), index=False)
+    print(f"Saved HAM10000 results to {os.path.join(results_dir, 'ham10000_results.csv')}")
     
     # Evaluate SCIN dataset
     print("\nEvaluating SCIN dataset...")
@@ -177,8 +204,19 @@ def main():
     
     # Save SCIN results
     scin_df = pd.DataFrame(scin_results)
+    scin_df['predicted_class'] = scin_df['prediction'].apply(extract_predicted_class)
+    scin_df['true_classes'] = scin_df['true_label'].apply(extract_true_classes)
+    scin_df['correct'] = scin_df.apply(is_correct, axis=1)
+    accuracy = scin_df['correct'].mean()
+    print(f"Adjusted Accuracy: {accuracy:.2%}")
     scin_df.to_csv(os.path.join(results_dir, "scin_results.csv"), index=False)
     print(f"Saved SCIN results to {os.path.join(results_dir, 'scin_results.csv')}")
+
+    # Apply classification report
+    df_valid = scin_df[scin_df['predicted_class'].notnull() & (scin_df['true_classes'].apply(len) > 0)]
+    df_valid['first_true_class'] = df_valid['true_classes'].apply(lambda s: list(s)[0] if s else None)
+
+    print(classification_report(df_valid['first_true_class'], df_valid['predicted_class']))
 
 if __name__ == "__main__":
     main() 
