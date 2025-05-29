@@ -65,7 +65,7 @@ class SkinGPTEvaluator:
             print(f"Error evaluating image {image_path}: {e}")
             return None
     
-    def evaluate_dataset(self, dataset_path, metadata_path, num_samples=None, image_column='image_id'):
+    def evaluate_dataset(self, dataset_path, metadata_path, num_samples=None, image_column='image_id', label_column='dx'):
         """Evaluate model on a dataset."""
         # Load metadata
         df = pd.read_csv(metadata_path)
@@ -84,7 +84,7 @@ class SkinGPTEvaluator:
             
             results.append({
                 'image': image_id,
-                'true_label': row['dx'],
+                'true_label': row['dermatologist_skin_condition_on_label_name'],
                 'prediction': prediction
             })
         
@@ -164,10 +164,11 @@ def main():
     # Evaluate SCIN dataset
     print("\nEvaluating SCIN dataset...")
     scin_results = evaluator.evaluate_dataset(
-        os.path.join(os.path.dirname(current_dir), "data/scin/images"),
+        os.path.join(os.path.dirname(current_dir), "data/scin"),
         os.path.join(os.path.dirname(current_dir), "data/scin/scin_merged.csv"),
-        num_samples=100,  # Start with a small sample for testing
-        image_column='image_1_path'  # Use the correct column for SCIN
+        num_samples=100,
+        image_column='image_1_path',
+        label_column='dermatologist_skin_condition_on_label_name'
     )
     
     # Save SCIN results
