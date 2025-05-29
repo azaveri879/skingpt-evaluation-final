@@ -110,12 +110,21 @@ def extract_predicted_class(text):
             return close[0]
     return None
 
-def extract_true_classes(label_str):
-    try:
-        labels = ast.literal_eval(label_str)
-        return set([l.lower() for l in labels])
-    except:
+def safe_extract_labels(x):
+    if pd.isnull(x):
         return set()
+    try:
+        # Try to parse as a list
+        labels = ast.literal_eval(x)
+        if isinstance(labels, list):
+            return set([l.lower() for l in labels])
+        elif isinstance(labels, str):
+            return set([labels.lower()])
+        else:
+            return set()
+    except Exception:
+        # If not a list, treat as a single label string
+        return set([str(x).lower()])
 
 def is_correct(row):
     return row['predicted_class'] in row['true_classes']
@@ -222,7 +231,7 @@ def main():
 
     # 3. Apply to your dataframe
     ham_df['predicted_class'] = ham_df['prediction'].apply(extract_predicted_class)
-    ham_df['true_classes'] = ham_df['true_label'].apply(lambda x: set([l.lower() for l in ast.literal_eval(x)]) if pd.notnull(x) else set())
+    ham_df['true_classes'] = ham_df['true_label'].apply(safe_extract_labels)
     ham_df['correct'] = ham_df.apply(lambda row: row['predicted_class'] in row['true_classes'], axis=1)
     accuracy = ham_df['correct'].mean()
     print(f"Adjusted Accuracy: {accuracy:.2%}")
