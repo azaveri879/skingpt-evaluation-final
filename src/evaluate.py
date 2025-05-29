@@ -99,10 +99,13 @@ class SkinGPTEvaluator:
 
 def extract_predicted_class(text):
     text = text.lower()
+    for key, val in label_map.items():
+        if key in text:
+            return val
+    # fallback to previous logic
     matches = [cls for cls in known_classes if cls in text]
     if matches:
         return matches[0]
-    # Fuzzy match
     words = text.split()
     for word in words:
         close = difflib.get_close_matches(word, known_classes, n=1, cutoff=0.8)
@@ -216,12 +219,27 @@ def main():
     print("Number of known classes:", len(known_classes))
 
     # 2. Improved extraction function
+    label_map = {
+        'melanoma': 'mel',
+        'melanocytic nevi': 'nv',
+        'benign keratosis': 'bkl',
+        'basal cell carcinoma': 'bcc',
+        'actinic keratoses': 'akiec',
+        'intraepithelial carcinoma': 'akiec',
+        'dermatofibroma': 'df',
+        'vascular lesion': 'vasc',
+        # add more as needed
+    }
+
     def extract_predicted_class(text):
         text = text.lower()
+        for key, val in label_map.items():
+            if key in text:
+                return val
+        # fallback to previous logic
         matches = [cls for cls in known_classes if cls in text]
         if matches:
             return matches[0]
-        # Fuzzy match
         words = text.split()
         for word in words:
             close = difflib.get_close_matches(word, known_classes, n=1, cutoff=0.8)
@@ -283,6 +301,8 @@ def main():
     known_classes = list(all_classes)
     print("Known classes:", known_classes)
     print("Number of known classes:", len(known_classes))
+
+    print(ham_df[['prediction', 'predicted_class', 'true_classes']].head(20))
 
 if __name__ == "__main__":
     main() 
