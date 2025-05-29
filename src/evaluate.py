@@ -6,6 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 import torch
 from PIL import Image
+import glob
 
 # Add SkinGPT-4 directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -74,14 +75,16 @@ class SkinGPTEvaluator:
         
         results = []
         for _, row in tqdm(df.iterrows(), total=len(df)):
-            # Add .jpg extension if not present
-            image_id = row[image_column]
+            image_id = row[image_column].strip()
+            if image_id.startswith('dataset/'):
+                image_id = image_id[len('dataset/'):]
             if not (image_id.endswith('.jpg') or image_id.endswith('.png') or image_id.endswith('.jpeg')):
                 image_id = f"{image_id}.jpg"
-            
             image_path = os.path.join(dataset_path, image_id)
+            print(f"Checking: {repr(image_path)}  Exists: {os.path.exists(image_path)}")
+            if not os.path.exists(image_path):
+                print("Files in directory:", glob.glob(os.path.dirname(image_path) + "/*"))
             prediction = self.evaluate_image(image_path)
-            
             results.append({
                 'image': image_id,
                 'true_label': row[label_column],
