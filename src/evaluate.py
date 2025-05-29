@@ -190,6 +190,9 @@ def main():
     # Save HAM10000 results
     ham_df = pd.DataFrame(ham10000_results)
     
+    print(ham_df['true_label'].head(10))
+    print(ham_df['true_label'].unique())
+    
     # 1. Build the set of all known classes from your true labels
     all_classes = set()
     for labels in ham_df['true_label']:
@@ -263,6 +266,14 @@ def main():
     # known_classes = list(all_classes)
     # print("SCIN known classes:", known_classes)
     # print("Number of SCIN known classes:", len(known_classes))
+
+    all_classes = set()
+    for labels in ham_df['true_classes']:
+        for l in labels:
+            all_classes.add(l)
+    known_classes = list(all_classes)
+    print("Known classes:", known_classes)
+    print("Number of known classes:", len(known_classes))
 
 if __name__ == "__main__":
     main() 
