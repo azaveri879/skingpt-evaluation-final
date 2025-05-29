@@ -76,7 +76,7 @@ class SkinGPTEvaluator:
         for _, row in tqdm(df.iterrows(), total=len(df)):
             # Add .jpg extension if not present
             image_id = row[image_column]
-            if not image_id.endswith('.jpg'):
+            if not (image_id.endswith('.jpg') or image_id.endswith('.png') or image_id.endswith('.jpeg')):
                 image_id = f"{image_id}.jpg"
             
             image_path = os.path.join(dataset_path, image_id)
@@ -147,20 +147,20 @@ def main():
     results_dir = os.path.join(os.path.dirname(current_dir), "results")
     os.makedirs(results_dir, exist_ok=True)
     
-    # Evaluate HAM10000 dataset
-    print("Evaluating HAM10000 dataset...")
-    ham10000_results = evaluator.evaluate_dataset(
-        os.path.join(os.path.dirname(current_dir), "data/ham10000/images"),
-        os.path.join(os.path.dirname(current_dir), "data/ham10000/HAM10000_metadata.csv"),
-        num_samples=100,
-        image_column='image_id',
-        label_column='dx'
-    )
+    # # Evaluate HAM10000 dataset
+    # print("Evaluating HAM10000 dataset...")
+    # ham10000_results = evaluator.evaluate_dataset(
+    #     os.path.join(os.path.dirname(current_dir), "data/ham10000/images"),
+    #     os.path.join(os.path.dirname(current_dir), "data/ham10000/HAM10000_metadata.csv"),
+    #     num_samples=100,
+    #     image_column='image_id',
+    #     label_column='dx'
+    # )
     
-    # Save HAM10000 results
-    ham_df = pd.DataFrame(ham10000_results)
-    ham_df.to_csv(os.path.join(results_dir, "ham10000_results.csv"), index=False)
-    print(f"Saved HAM10000 results to {os.path.join(results_dir, 'ham10000_results.csv')}")
+    # # Save HAM10000 results
+    # ham_df = pd.DataFrame(ham10000_results)
+    # ham_df.to_csv(os.path.join(results_dir, "ham10000_results.csv"), index=False)
+    # print(f"Saved HAM10000 results to {os.path.join(results_dir, 'ham10000_results.csv')}")
     
     # Evaluate SCIN dataset
     print("\nEvaluating SCIN dataset...")
