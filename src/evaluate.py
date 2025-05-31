@@ -342,7 +342,7 @@ def main():
     # Save SCIN results
     scin_df = pd.DataFrame(scin_results)
     scin_df['predicted_class'] = scin_df['prediction'].apply(extract_predicted_class)
-    scin_df['true_classes'] = scin_df['true_label'].apply(extract_true_classes)
+    scin_df['true_classes'] = scin_df['true_label'].apply(safe_extract_labels)
     scin_df['correct'] = scin_df.apply(is_correct, axis=1)
     accuracy = scin_df['correct'].mean()
     print(f"Adjusted Accuracy: {accuracy:.2%}")
@@ -367,21 +367,10 @@ def main():
     print("SCIN known classes:", known_classes)
     print("Number of SCIN known classes:", len(known_classes))
 
-    all_classes = set()
-    for labels in ham_df['true_classes']:
-        for l in labels:
-            all_classes.add(l)
-    known_classes = list(all_classes)
-    print("Known classes:", known_classes)
-    print("Number of known classes:", len(known_classes))
-
-    print(ham_df[['prediction', 'predicted_class', 'true_classes']].head(20))
-
-    print(ham_df[ham_df['predicted_class'].isnull()][['prediction']].head(20))
-
-    unmatched = ham_df[ham_df['predicted_class'].isnull()]
+    # Analyze unmatched SCIN predictions
+    unmatched = scin_df[scin_df['predicted_class'].isnull()]
     if not unmatched.empty:
-        print("\nAnalyzing unmatched predictions:")
+        print("\nAnalyzing unmatched SCIN predictions:")
         for _, row in unmatched.head(5).iterrows():
             print(f"\nPrediction: {row['prediction'][:100]}...")
             print(f"True label: {row['true_label']}")
