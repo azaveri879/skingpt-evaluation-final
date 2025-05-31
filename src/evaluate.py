@@ -11,6 +11,7 @@ import re
 import ast
 from sklearn.metrics import classification_report
 import difflib
+from collections import Counter
 
 # Add SkinGPT-4 directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -313,6 +314,35 @@ def main():
     print(ham_df[['prediction', 'predicted_class', 'true_classes']].head(20))
 
     print(ham_df[ham_df['predicted_class'].isnull()][['prediction']].head(20))
+
+    unmatched = ham_df[ham_df['predicted_class'].isnull()]['prediction']
+    words = Counter()
+    for pred in unmatched:
+        words.update(pred.lower().split())
+    print(words.most_common(50))
+
+    # --- Automation: Suggest new label_map candidates ---
+    def suggest_label_map_candidates(unmatched_preds, known_classes, label_map, top_n=30):
+        # Tokenize predictions and count n-grams (1-3 words)
+        from collections import Counter
+        import itertools
+        ngram_counts = Counter()
+        for pred in unmatched_preds:
+            tokens = pred.lower().split()
+            for n in [1, 2, 3]:
+                for i in range(len(tokens) - n + 1):
+                    ngram = ' '.join(tokens[i:i+n])
+                    ngram_counts[ngram] += 1
+        # Exclude ngrams already in label_map or known_classes
+        exclude = set(label_map.keys()) | set(known_classes)
+        candidates = [(ngram, count) for ngram, count in ngram_counts.items() if ngram not in exclude and count > 1]
+        candidates.sort(key=lambda x: -x[1])
+        print("\nTop new mapping candidates from unmatched predictions:")
+        for ngram, count in candidates[:top_n]:
+            print(f"  '{ngram}': '',  # seen {count} times")
+        print("\nCopy any relevant ones into your label_map!")
+
+    suggest_label_map_candidates(unmatched, known_classes, label_map)
 
 if __name__ == "__main__":
     main() 
