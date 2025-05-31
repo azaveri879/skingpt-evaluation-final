@@ -35,6 +35,70 @@ prompt_templates = [
     "What is the most probable skin condition? {class_list}.",
 ]
 
+# Build the set of all known classes from your true labels in the metadata
+ham_metadata = pd.read_csv(os.path.join(os.path.dirname(current_dir), "data/ham10000/HAM10000_metadata.csv"))
+all_classes = set()
+for labels in ham_metadata['dx']:
+    try:
+        for l in ast.literal_eval(labels):
+            all_classes.add(l.lower())
+    except:
+        all_classes.add(str(labels).lower())
+known_classes = list(all_classes)
+
+label_map = {
+    # Melanoma related terms
+    'melanoma': 'mel',
+    'malignant melanoma': 'mel',
+    'malignant lesion': 'mel',
+    'irregular border': 'mel',
+    'irregular shape': 'mel',
+    'asymmetrical': 'mel',
+    'multiple colors': 'mel',
+    'variegated': 'mel',
+    # Nevus related terms
+    'melanocytic nevi': 'nv',
+    'nevus': 'nv',
+    'mole': 'nv',
+    'benign mole': 'nv',
+    'regular border': 'nv',
+    'symmetrical': 'nv',
+    'uniform color': 'nv',
+    # BKL related terms
+    'benign keratosis': 'bkl',
+    'keratosis': 'bkl',
+    'seborrheic keratosis': 'bkl',
+    'seborrheic': 'bkl',
+    'scaly': 'bkl',
+    'rough surface': 'bkl',
+    'stuck on': 'bkl',
+    # BCC related terms
+    'basal cell carcinoma': 'bcc',
+    'bcc': 'bcc',
+    'pearly': 'bcc',
+    'rolled border': 'bcc',
+    'telangiectasia': 'bcc',
+    'ulcerated': 'bcc',
+    # AKIEC related terms
+    'actinic keratoses': 'akiec',
+    'intraepithelial carcinoma': 'akiec',
+    'solar keratosis': 'akiec',
+    'actinic': 'akiec',
+    'precancerous': 'akiec',
+    # DF related terms
+    'dermatofibroma': 'df',
+    'fibroma': 'df',
+    'firm': 'df',
+    'dimple sign': 'df',
+    # VASC related terms
+    'vascular lesion': 'vasc',
+    'angioma': 'vasc',
+    'hemangioma': 'vasc',
+    'vascular': 'vasc',
+    'red': 'vasc',
+    'purple': 'vasc'
+}
+
 class SkinGPTEvaluator:
     def __init__(self, config_path, device='cuda:0'):
         """Initialize SkinGPT evaluator."""
@@ -212,17 +276,6 @@ def main():
     # Create results directory
     results_dir = os.path.join(os.path.dirname(current_dir), "results")
     os.makedirs(results_dir, exist_ok=True)
-    
-    # Build the set of all known classes from your true labels in the metadata
-    ham_metadata = pd.read_csv(os.path.join(os.path.dirname(current_dir), "data/ham10000/HAM10000_metadata.csv"))
-    all_classes = set()
-    for labels in ham_metadata['dx']:
-        try:
-            for l in ast.literal_eval(labels):
-                all_classes.add(l.lower())
-        except:
-            all_classes.add(str(labels).lower())
-    known_classes = list(all_classes)
     
     # After loading/defining known_classes and label_map for HAM10000:
     ham_class_list = ', '.join(sorted(known_classes))
