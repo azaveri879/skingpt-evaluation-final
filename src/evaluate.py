@@ -221,40 +221,104 @@ def main():
 
     # 2. Improved extraction function
     label_map = {
+        # Melanoma related terms
         'melanoma': 'mel',
+        'malignant melanoma': 'mel',
+        'malignant lesion': 'mel',
+        'irregular border': 'mel',
+        'irregular shape': 'mel',
+        'asymmetrical': 'mel',
+        'multiple colors': 'mel',
+        'variegated': 'mel',
+        
+        # Nevus related terms
         'melanocytic nevi': 'nv',
         'nevus': 'nv',
         'mole': 'nv',
+        'benign mole': 'nv',
+        'regular border': 'nv',
+        'symmetrical': 'nv',
+        'uniform color': 'nv',
+        
+        # BKL related terms
         'benign keratosis': 'bkl',
         'keratosis': 'bkl',
         'seborrheic keratosis': 'bkl',
+        'seborrheic': 'bkl',
+        'scaly': 'bkl',
+        'rough surface': 'bkl',
+        'stuck on': 'bkl',
+        
+        # BCC related terms
         'basal cell carcinoma': 'bcc',
         'bcc': 'bcc',
+        'pearly': 'bcc',
+        'rolled border': 'bcc',
+        'telangiectasia': 'bcc',
+        'ulcerated': 'bcc',
+        
+        # AKIEC related terms
         'actinic keratoses': 'akiec',
         'intraepithelial carcinoma': 'akiec',
+        'solar keratosis': 'akiec',
+        'actinic': 'akiec',
+        'precancerous': 'akiec',
+        
+        # DF related terms
         'dermatofibroma': 'df',
         'fibroma': 'df',
+        'firm': 'df',
+        'dimple sign': 'df',
+        
+        # VASC related terms
         'vascular lesion': 'vasc',
         'angioma': 'vasc',
         'hemangioma': 'vasc',
-        # add more as you see in your predictions
+        'vascular': 'vasc',
+        'red': 'vasc',
+        'purple': 'vasc'
     }
 
     def extract_predicted_class(text):
         text = text.lower()
+        
+        # First try exact matches from label_map
         for key, val in label_map.items():
             if key in text:
                 return val
-        # fallback to previous logic
-        matches = [cls for cls in known_classes if cls in text]
-        if matches:
-            return matches[0]
+        
+        # Look for characteristic features
+        features = {
+            'mel': ['irregular', 'asymmetrical', 'multiple colors', 'variegated'],
+            'nv': ['regular', 'symmetrical', 'uniform', 'round'],
+            'bkl': ['scaly', 'rough', 'stuck on'],
+            'bcc': ['pearly', 'rolled', 'telangiectasia', 'ulcerated'],
+            'akiec': ['actinic', 'precancerous', 'solar'],
+            'df': ['firm', 'dimple'],
+            'vasc': ['red', 'purple', 'vascular']
+        }
+        
+        for class_name, feature_list in features.items():
+            if any(feature in text for feature in feature_list):
+                return class_name
+        
+        # Fallback to fuzzy matching
         words = text.split()
         for word in words:
             close = difflib.get_close_matches(word, known_classes, n=1, cutoff=0.8)
             if close:
                 return close[0]
+        
         return None
+
+    def analyze_prediction(text):
+        """Helper function to analyze why a prediction wasn't matched"""
+        text = text.lower()
+        found_terms = []
+        for key, val in label_map.items():
+            if key in text:
+                found_terms.append(f"{key} -> {val}")
+        return found_terms
 
     # 3. Apply to your dataframe
     ham_df['predicted_class'] = ham_df['prediction'].apply(extract_predicted_class)
@@ -315,11 +379,13 @@ def main():
 
     print(ham_df[ham_df['predicted_class'].isnull()][['prediction']].head(20))
 
-    unmatched = ham_df[ham_df['predicted_class'].isnull()]['prediction']
-    words = Counter()
-    for pred in unmatched:
-        words.update(pred.lower().split())
-    print(words.most_common(50))
+    unmatched = ham_df[ham_df['predicted_class'].isnull()]
+    if not unmatched.empty:
+        print("\nAnalyzing unmatched predictions:")
+        for _, row in unmatched.head(5).iterrows():
+            print(f"\nPrediction: {row['prediction'][:100]}...")
+            print(f"True label: {row['true_label']}")
+            print("Found terms:", analyze_prediction(row['prediction']))
 
     # --- Automation: Suggest new label_map candidates ---
     def suggest_label_map_candidates(unmatched_preds, known_classes, label_map, top_n=30):
