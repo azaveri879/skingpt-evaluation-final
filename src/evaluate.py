@@ -339,36 +339,118 @@ def main():
         label_column='dermatologist_skin_condition_on_label_name'
     )
     
+    # SCIN-specific label mapping
+    scin_label_map = {
+        # Inflammatory conditions
+        'eczema': 'eczema',
+        'dermatitis': 'acute dermatitis, nos',
+        'allergic contact': 'allergic contact dermatitis',
+        'irritant contact': 'irritant contact dermatitis',
+        'seborrheic': 'seborrheic dermatitis',
+        'psoriasis': 'psoriasis',
+        'lichen planus': 'lichen planus/lichenoid eruption',
+        'lichenoid': 'lichen planus/lichenoid eruption',
+        
+        # Infections
+        'impetigo': 'impetigo',
+        'tinea': 'tinea',
+        'fungal': 'tinea',
+        'ringworm': 'tinea',
+        'molluscum': 'molluscum contagiosum',
+        'scabies': 'scabies',
+        'candida': 'candida',
+        'viral': 'viral exanthem',
+        
+        # Vascular conditions
+        'vasculitis': 'leukocytoclastic vasculitis',
+        'purpuric': 'pigmented purpuric eruption',
+        'petechiae': 'traumatic petechiae',
+        'ecchymosis': 'o/e - ecchymoses present',
+        
+        # Other conditions
+        'acne': 'acne',
+        'rosacea': 'rosacea',
+        'urticaria': 'urticaria',
+        'hives': 'urticaria',
+        'granuloma': 'granuloma annulare',
+        'insect bite': 'insect bite',
+        'milia': 'milia',
+        'kaposi': "kaposi's sarcoma of skin",
+        'hypersensitivity': 'hypersensitivity',
+        'allergic': 'hypersensitivity',
+        'foreign body': 'foreign body',
+        'abrasion': 'abrasion, scrape, or scab',
+        'scrape': 'abrasion, scrape, or scab',
+        'scab': 'abrasion, scrape, or scab',
+        'cut': 'abrasion, scrape, or scab',
+        'wound': 'abrasion, scrape, or scab'
+    }
+
+    def extract_scin_class(text):
+        """Extract SCIN classes from prediction text."""
+        text = text.lower()
+        found_classes = set()
+        
+        # First try exact matches
+        for key, val in scin_label_map.items():
+            if key in text:
+                found_classes.add(val)
+        
+        # Look for characteristic features
+        features = {
+            'eczema': ['itchy', 'red', 'inflamed', 'dry', 'scaly'],
+            'dermatitis': ['inflamed', 'irritated', 'red', 'itchy'],
+            'psoriasis': ['silvery', 'scaly', 'thick', 'plaques'],
+            'impetigo': ['honey-colored', 'crust', 'blister', 'sore'],
+            'tinea': ['ring', 'circular', 'fungal', 'scaly'],
+            'scabies': ['burrow', 'tunnel', 'itchy', 'rash'],
+            'vasculitis': ['purple', 'red', 'spots', 'bruise'],
+            'acne': ['pimple', 'blackhead', 'whitehead', 'comedone'],
+            'rosacea': ['red', 'flushing', 'bumps', 'pustules'],
+            'urticaria': ['hive', 'wheal', 'itchy', 'raised']
+        }
+        
+        for class_name, feature_list in features.items():
+            if any(feature in text for feature in feature_list):
+                if class_name in scin_label_map:
+                    found_classes.add(scin_label_map[class_name])
+        
+        return list(found_classes) if found_classes else None
+
+    def is_scin_correct(row):
+        """Check if any predicted class matches any true class."""
+        if not row['predicted_classes'] or not row['true_classes']:
+            return False
+        return bool(set(row['predicted_classes']) & row['true_classes'])
+
     # Save SCIN results
     scin_df = pd.DataFrame(scin_results)
-    scin_df['predicted_class'] = scin_df['prediction'].apply(extract_predicted_class)
+    scin_df['predicted_classes'] = scin_df['prediction'].apply(extract_scin_class)
     scin_df['true_classes'] = scin_df['true_label'].apply(safe_extract_labels)
-    scin_df['correct'] = scin_df.apply(is_correct, axis=1)
+    scin_df['correct'] = scin_df.apply(is_scin_correct, axis=1)
     accuracy = scin_df['correct'].mean()
     print(f"Adjusted Accuracy: {accuracy:.2%}")
     scin_df.to_csv(os.path.join(results_dir, "scin_results.csv"), index=False)
     print(f"Saved SCIN results to {os.path.join(results_dir, 'scin_results.csv')}")
 
     # Apply classification report
-    df_valid = scin_df[scin_df['predicted_class'].notnull() & (scin_df['true_classes'].apply(len) > 0)]
-    df_valid['first_true_class'] = df_valid['true_classes'].apply(lambda s: list(s)[0] if s else None)
-
-    print(classification_report(df_valid['first_true_class'], df_valid['predicted_class']))
-
-    # If you want to see SCIN known classes
-    all_classes = set()
-    for labels in scin_df['true_label']:
-        try:
-            for l in ast.literal_eval(labels):
-                all_classes.add(l.lower())
-        except:
-            pass
-    known_classes = list(all_classes)
-    print("SCIN known classes:", known_classes)
-    print("Number of SCIN known classes:", len(known_classes))
+    df_valid = scin_df[scin_df['predicted_classes'].notnull() & (scin_df['true_classes'].apply(len) > 0)]
+    
+    # Flatten predictions and true labels for classification report
+    all_preds = []
+    all_true = []
+    for _, row in df_valid.iterrows():
+        preds = row['predicted_classes']
+        trues = list(row['true_classes'])
+        if preds and trues:
+            all_preds.extend(preds)
+            all_true.extend(trues)
+    
+    print("\nClassification Report:")
+    print(classification_report(all_true, all_preds, zero_division=0))
 
     # Analyze unmatched SCIN predictions
-    unmatched = scin_df[scin_df['predicted_class'].isnull()]
+    unmatched = scin_df[scin_df['predicted_classes'].isnull()]
     if not unmatched.empty:
         print("\nAnalyzing unmatched SCIN predictions:")
         for _, row in unmatched.head(5).iterrows():
