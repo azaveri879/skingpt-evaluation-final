@@ -99,6 +99,23 @@ label_map = {
     'purple': 'vasc'
 }
 
+scin_label_map = {
+    # Inflammatory conditions
+    'eczema': 'eczema',
+    'atopic': 'eczema',
+    'dermatitis': 'acute dermatitis, nos',
+    # ... (rest of your mapping)
+}
+
+def extract_scin_class(text):
+    text = text.lower()
+    found_classes = set()
+    for key, val in scin_label_map.items():
+        if key in text:
+            found_classes.add(val)
+    # ... (rest of your extraction logic)
+    return list(found_classes) if found_classes else None
+
 class SkinGPTEvaluator:
     def __init__(self, config_path, device='cuda:0'):
         """Initialize SkinGPT evaluator."""
