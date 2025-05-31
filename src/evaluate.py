@@ -23,6 +23,18 @@ from skingpt4.common.config import Config
 from skingpt4.common.registry import registry
 from skingpt4.conversation.conversation import Chat, CONV_VISION
 
+# --- PROMPT ENSEMBLE SETUP ---
+# Define a fixed set of prompt templates (with a placeholder for class list)
+prompt_templates = [
+    "What is the most likely diagnosis for this skin lesion? Please answer with one of the following classes: {class_list}.",
+    "Which of the following diagnoses best describes this skin lesion? {class_list}.",
+    "Select the most appropriate diagnosis from this list: {class_list}.",
+    "This is a dermatology image. What is the diagnosis? Choose from: {class_list}.",
+    "What is the diagnosis? (Choose from: {class_list})",
+    "What is the single best diagnosis for this image? {class_list}.",
+    "What is the most probable skin condition? {class_list}.",
+]
+
 class SkinGPTEvaluator:
     def __init__(self, config_path, device='cuda:0'):
         """Initialize SkinGPT evaluator."""
@@ -40,7 +52,7 @@ class SkinGPTEvaluator:
         vis_processor = registry.get_processor_class(vis_processor_cfg.name).from_config(vis_processor_cfg)
         self.chat = Chat(self.model, vis_processor, device=device)
     
-    def evaluate_image(self, image_path, prompt="What is the diagnosis for this skin lesion?"):
+    def evaluate_image(self, image_path, prompt="What is the most likely diagnosis for this skin lesion? Please answer with one of the following classes: eczema, psoriasis, tinea, impetigo, urticaria, ... (list all classes for your dataset)."):
         """Evaluate a single image."""
         try:
             # Load and preprocess image
@@ -71,13 +83,18 @@ class SkinGPTEvaluator:
             print(f"Error evaluating image {image_path}: {e}")
             return None
     
-    def evaluate_dataset(self, dataset_path, metadata_path, num_samples=None, image_column='image_id', label_column='dx'):
-        """Evaluate model on a dataset."""
-        # Load metadata
+    def evaluate_image_with_prompts(self, image_path, prompts):
+        predictions = []
+        for prompt in prompts:
+            pred = self.evaluate_image(image_path, prompt=prompt)
+            predictions.append(pred)
+        return predictions
+    
+    def evaluate_dataset(self, dataset_path, metadata_path, num_samples=None, image_column='image_id', label_column='dx', prompts=None, extract_class_fn=None):
+        """Evaluate model on a dataset using prompt ensemble."""
         df = pd.read_csv(metadata_path)
         if num_samples:
             df = df.sample(n=num_samples, random_state=42)
-        
         results = []
         for _, row in tqdm(df.iterrows(), total=len(df)):
             image_id = row[image_column].strip()
@@ -86,16 +103,22 @@ class SkinGPTEvaluator:
             if not (image_id.endswith('.jpg') or image_id.endswith('.png') or image_id.endswith('.jpeg')):
                 image_id = f"{image_id}.jpg"
             image_path = os.path.join(dataset_path, image_id)
-            # print(f"Checking: {repr(image_path)}  Exists: {os.path.exists(image_path)}")
             if not os.path.exists(image_path):
                 print("Files in directory:", glob.glob(os.path.dirname(image_path) + "/*"))
-            prediction = self.evaluate_image(image_path)
+            all_preds = self.evaluate_image_with_prompts(image_path, prompts)
+            # Extract class for each prediction
+            all_classes = [extract_class_fn(pred) for pred in all_preds if pred]
+            # Aggregate (majority vote)
+            flat = [cls for cls in all_classes if cls]
+            if flat:
+                final_pred = Counter(flat).most_common(1)[0][0]
+            else:
+                final_pred = None
             results.append({
                 'image': image_id,
                 'true_label': row[label_column],
-                'prediction': prediction
+                'prediction': final_pred
             })
-        
         return results
 
 def extract_predicted_class(text):
@@ -190,14 +213,18 @@ def main():
     results_dir = os.path.join(os.path.dirname(current_dir), "results")
     os.makedirs(results_dir, exist_ok=True)
     
-    # Evaluate HAM10000 dataset
+    # After loading/defining known_classes and label_map for HAM10000:
+    ham_class_list = ', '.join(sorted(known_classes))
+    ham_prompts = [p.format(class_list=ham_class_list) for p in prompt_templates]
     print("Evaluating HAM10000 dataset...")
     ham10000_results = evaluator.evaluate_dataset(
         os.path.join(os.path.dirname(current_dir), "data/ham10000/images"),
         os.path.join(os.path.dirname(current_dir), "data/ham10000/HAM10000_metadata.csv"),
         num_samples=100,
         image_column='image_id',
-        label_column='dx'
+        label_column='dx',
+        prompts=ham_prompts,
+        extract_class_fn=extract_predicted_class
     )
     
     # Save HAM10000 results
@@ -206,301 +233,22 @@ def main():
     print(ham_df['true_label'].head(10))
     print(ham_df['true_label'].unique())
     
-    # 1. Build the set of all known classes from your true labels
-    all_classes = set()
-    for labels in ham_df['true_label']:
-        try:
-            for l in ast.literal_eval(labels):
-                all_classes.add(l.lower())
-        except:
-            pass
-    known_classes = list(all_classes)
-
-    print("Known classes:", known_classes)
-    print("Number of known classes:", len(known_classes))
-
-    # 2. Improved extraction function
-    label_map = {
-        # Melanoma related terms
-        'melanoma': 'mel',
-        'malignant melanoma': 'mel',
-        'malignant lesion': 'mel',
-        'irregular border': 'mel',
-        'irregular shape': 'mel',
-        'asymmetrical': 'mel',
-        'multiple colors': 'mel',
-        'variegated': 'mel',
-        
-        # Nevus related terms
-        'melanocytic nevi': 'nv',
-        'nevus': 'nv',
-        'mole': 'nv',
-        'benign mole': 'nv',
-        'regular border': 'nv',
-        'symmetrical': 'nv',
-        'uniform color': 'nv',
-        
-        # BKL related terms
-        'benign keratosis': 'bkl',
-        'keratosis': 'bkl',
-        'seborrheic keratosis': 'bkl',
-        'seborrheic': 'bkl',
-        'scaly': 'bkl',
-        'rough surface': 'bkl',
-        'stuck on': 'bkl',
-        
-        # BCC related terms
-        'basal cell carcinoma': 'bcc',
-        'bcc': 'bcc',
-        'pearly': 'bcc',
-        'rolled border': 'bcc',
-        'telangiectasia': 'bcc',
-        'ulcerated': 'bcc',
-        
-        # AKIEC related terms
-        'actinic keratoses': 'akiec',
-        'intraepithelial carcinoma': 'akiec',
-        'solar keratosis': 'akiec',
-        'actinic': 'akiec',
-        'precancerous': 'akiec',
-        
-        # DF related terms
-        'dermatofibroma': 'df',
-        'fibroma': 'df',
-        'firm': 'df',
-        'dimple sign': 'df',
-        
-        # VASC related terms
-        'vascular lesion': 'vasc',
-        'angioma': 'vasc',
-        'hemangioma': 'vasc',
-        'vascular': 'vasc',
-        'red': 'vasc',
-        'purple': 'vasc'
-    }
-
-    def extract_predicted_class(text):
-        text = text.lower()
-        
-        # First try exact matches from label_map
-        for key, val in label_map.items():
-            if key in text:
-                return val
-        
-        # Look for characteristic features
-        features = {
-            'mel': ['irregular', 'asymmetrical', 'multiple colors', 'variegated'],
-            'nv': ['regular', 'symmetrical', 'uniform', 'round'],
-            'bkl': ['scaly', 'rough', 'stuck on'],
-            'bcc': ['pearly', 'rolled', 'telangiectasia', 'ulcerated'],
-            'akiec': ['actinic', 'precancerous', 'solar'],
-            'df': ['firm', 'dimple'],
-            'vasc': ['red', 'purple', 'vascular']
-        }
-        
-        for class_name, feature_list in features.items():
-            if any(feature in text for feature in feature_list):
-                return class_name
-        
-        # Fallback to fuzzy matching
-        words = text.split()
-        for word in words:
-            close = difflib.get_close_matches(word, known_classes, n=1, cutoff=0.8)
-            if close:
-                return close[0]
-        
-        return None
-
-    def analyze_prediction(text):
-        """Helper function to analyze why a prediction wasn't matched"""
-        text = text.lower()
-        found_terms = []
-        for key, val in label_map.items():
-            if key in text:
-                found_terms.append(f"{key} -> {val}")
-        return found_terms
-
-    # 3. Apply to your dataframe
-    ham_df['predicted_class'] = ham_df['prediction'].apply(extract_predicted_class)
-    ham_df['true_classes'] = ham_df['true_label'].apply(safe_extract_labels)
-    ham_df['correct'] = ham_df.apply(lambda row: row['predicted_class'] in row['true_classes'], axis=1)
-    accuracy = ham_df['correct'].mean()
-    print(f"Adjusted Accuracy: {accuracy:.2%}")
-    ham_df.to_csv(os.path.join(results_dir, "ham10000_results.csv"), index=False)
-    print(f"Saved HAM10000 results to {os.path.join(results_dir, 'ham10000_results.csv')}")
-    
-    # Evaluate SCIN dataset
+    # For SCIN dataset, after defining scin_label_map and extracting all SCIN classes:
+    scin_class_list = ', '.join(sorted(set(scin_label_map.values())))
+    scin_prompts = [p.format(class_list=scin_class_list) for p in prompt_templates]
     print("\nEvaluating SCIN dataset...")
     scin_results = evaluator.evaluate_dataset(
         os.path.join(os.path.dirname(current_dir), "data/scin"),
         os.path.join(os.path.dirname(current_dir), "data/scin/scin_merged.csv"),
         num_samples=100,
         image_column='image_1_path',
-        label_column='dermatologist_skin_condition_on_label_name'
+        label_column='dermatologist_skin_condition_on_label_name',
+        prompts=scin_prompts,
+        extract_class_fn=extract_scin_class
     )
     
-    # SCIN-specific label mapping
-    scin_label_map = {
-        # Inflammatory conditions
-        'eczema': 'eczema',
-        'atopic': 'eczema',
-        'dermatitis': 'acute dermatitis, nos',
-        'allergic contact': 'allergic contact dermatitis',
-        'irritant contact': 'irritant contact dermatitis',
-        'seborrheic': 'seborrheic dermatitis',
-        'seborrheic eczema': 'seborrheic dermatitis',
-        'psoriasis': 'psoriasis',
-        'psoriatic': 'psoriasis',
-        'lichen planus': 'lichen planus/lichenoid eruption',
-        'lichenoid': 'lichen planus/lichenoid eruption',
-        'lichen': 'lichen planus/lichenoid eruption',
-        'lichen simplex': 'lichen simplex chronicus',
-        'lichen nitidus': 'lichen nitidus',
-        'lichen planus': 'lichen planus/lichenoid eruption',
-        
-        # Infections
-        'impetigo': 'impetigo',
-        'tinea': 'tinea',
-        'ringworm': 'tinea',
-        'fungal': 'tinea',
-        'dermatophyte': 'tinea',
-        'molluscum': 'molluscum contagiosum',
-        'molluscum contagiosum': 'molluscum contagiosum',
-        'scabies': 'scabies',
-        'candida': 'candida',
-        'yeast': 'candida',
-        'viral': 'viral exanthem',
-        'viral rash': 'viral exanthem',
-        'folliculitis': 'folliculitis',
-        'hair follicle': 'folliculitis',
-        'intertrigo': 'intertrigo',
-        'skin fold': 'intertrigo',
-        
-        # Vascular conditions
-        'vasculitis': 'leukocytoclastic vasculitis',
-        'purpuric': 'pigmented purpuric eruption',
-        'petechiae': 'traumatic petechiae',
-        'ecchymosis': 'o/e - ecchymoses present',
-        'bruise': 'o/e - ecchymoses present',
-        'erythema': 'erythema multiforme',
-        'erythema nodosum': 'erythema nodosum',
-        'nodular': 'erythema nodosum',
-        
-        # Other conditions
-        'acne': 'acne',
-        'pimple': 'acne',
-        'comedone': 'acne',
-        'rosacea': 'rosacea',
-        'urticaria': 'urticaria',
-        'hives': 'urticaria',
-        'wheal': 'urticaria',
-        'granuloma': 'granuloma annulare',
-        'annulare': 'granuloma annulare',
-        'insect bite': 'insect bite',
-        'bug bite': 'insect bite',
-        'milia': 'milia',
-        'kaposi': "kaposi's sarcoma of skin",
-        'sarcoma': "kaposi's sarcoma of skin",
-        'hypersensitivity': 'hypersensitivity',
-        'allergic': 'hypersensitivity',
-        'allergy': 'hypersensitivity',
-        'foreign body': 'foreign body',
-        'abrasion': 'abrasion, scrape, or scab',
-        'scrape': 'abrasion, scrape, or scab',
-        'scab': 'abrasion, scrape, or scab',
-        'cut': 'abrasion, scrape, or scab',
-        'wound': 'abrasion, scrape, or scab',
-        'lupus': 'cutaneous lupus',
-        'discoid': 'cutaneous lupus',
-        'drug rash': 'drug rash',
-        'medication': 'drug rash',
-        'dermatitis herpetiformis': 'dermatitis herpetiformis',
-        'herpetiformis': 'dermatitis herpetiformis',
-        'flushing': 'flushing',
-        'redness': 'flushing',
-        'prurigo': 'prurigo nodularis',
-        'nodularis': 'prurigo nodularis',
-        'pityriasis': 'pityriasis rosea',
-        'rosea': 'pityriasis rosea',
-        'rubra pilaris': 'pityriasis rubra pilaris',
-        'xerosis': 'xerosis',
-        'dry skin': 'xerosis',
-        'parapsoriasis': 'parapsoriasis',
-        'mycobacterial': 'skin and soft tissue atypical mycobacterial infection',
-        'cellulitis': 'skin and soft tissue atypical mycobacterial infection'
-    }
-
-    def extract_scin_class(text):
-        """Extract SCIN classes from prediction text."""
-        text = text.lower()
-        found_classes = set()
-        
-        # First try exact matches
-        for key, val in scin_label_map.items():
-            if key in text:
-                found_classes.add(val)
-        
-        # Look for characteristic features
-        features = {
-            'eczema': ['itchy', 'red', 'inflamed', 'dry', 'scaly', 'atopic'],
-            'dermatitis': ['inflamed', 'irritated', 'red', 'itchy', 'rash'],
-            'psoriasis': ['silvery', 'scaly', 'thick', 'plaques', 'psoriatic'],
-            'impetigo': ['honey-colored', 'crust', 'blister', 'sore', 'bacterial'],
-            'tinea': ['ring', 'circular', 'fungal', 'scaly', 'ringworm'],
-            'scabies': ['burrow', 'tunnel', 'itchy', 'rash', 'mite'],
-            'vasculitis': ['purple', 'red', 'spots', 'bruise', 'blood vessel'],
-            'acne': ['pimple', 'blackhead', 'whitehead', 'comedone', 'zit'],
-            'rosacea': ['red', 'flushing', 'bumps', 'pustules', 'facial'],
-            'urticaria': ['hive', 'wheal', 'itchy', 'raised', 'allergic'],
-            'lichen': ['white', 'lacy', 'pattern', 'flat', 'top'],
-            'molluscum': ['pearl', 'dome', 'umbilicated', 'viral', 'wart'],
-            'folliculitis': ['hair', 'follicle', 'pustule', 'infected', 'bacterial'],
-            'intertrigo': ['fold', 'moist', 'red', 'irritated', 'friction'],
-            'erythema': ['red', 'target', 'bullseye', 'multiforme', 'nodosum'],
-            'granuloma': ['ring', 'annular', 'raised', 'firm', 'nodule'],
-            'xerosis': ['dry', 'rough', 'scaly', 'cracked', 'dehydrated'],
-            'cellulitis': ['red', 'warm', 'swollen', 'tender', 'infection']
-        }
-        
-        for class_name, feature_list in features.items():
-            if any(feature in text for feature in feature_list):
-                if class_name in scin_label_map:
-                    found_classes.add(scin_label_map[class_name])
-        
-        # Look for location-specific terms
-        locations = {
-            'face': ['acne', 'rosacea', 'seborrheic dermatitis'],
-            'scalp': ['seborrheic dermatitis', 'psoriasis', 'tinea'],
-            'trunk': ['tinea', 'pityriasis rosea', 'viral exanthem'],
-            'arm': ['eczema', 'lichen planus', 'granuloma annulare'],
-            'leg': ['stasis dermatitis', 'cellulitis', 'erythema nodosum'],
-            'hand': ['dyshidrotic eczema', 'tinea', 'contact dermatitis'],
-            'foot': ['tinea', 'contact dermatitis', 'dyshidrotic eczema'],
-            'groin': ['tinea', 'intertrigo', 'candida'],
-            'fold': ['intertrigo', 'candida', 'inverse psoriasis']
-        }
-        
-        for location, conditions in locations.items():
-            if location in text:
-                for condition in conditions:
-                    if condition in scin_label_map:
-                        found_classes.add(scin_label_map[condition])
-        
-        return list(found_classes) if found_classes else None
-
-    def is_scin_correct(row):
-        """Check if any predicted class matches any true class."""
-        if not row['predicted_classes'] or not row['true_classes']:
-            return False
-        return bool(set(row['predicted_classes']) & row['true_classes'])
-
     # Save SCIN results
     scin_df = pd.DataFrame(scin_results)
-    scin_df['predicted_classes'] = scin_df['prediction'].apply(extract_scin_class)
-    scin_df['true_classes'] = scin_df['true_label'].apply(safe_extract_labels)
-    scin_df['correct'] = scin_df.apply(is_scin_correct, axis=1)
-    accuracy = scin_df['correct'].mean()
-    print(f"Adjusted Accuracy: {accuracy:.2%}")
     scin_df.to_csv(os.path.join(results_dir, "scin_results.csv"), index=False)
     print(f"Saved SCIN results to {os.path.join(results_dir, 'scin_results.csv')}")
 
