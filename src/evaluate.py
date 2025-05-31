@@ -213,6 +213,17 @@ def main():
     results_dir = os.path.join(os.path.dirname(current_dir), "results")
     os.makedirs(results_dir, exist_ok=True)
     
+    # Build the set of all known classes from your true labels in the metadata
+    ham_metadata = pd.read_csv(os.path.join(os.path.dirname(current_dir), "data/ham10000/HAM10000_metadata.csv"))
+    all_classes = set()
+    for labels in ham_metadata['dx']:
+        try:
+            for l in ast.literal_eval(labels):
+                all_classes.add(l.lower())
+        except:
+            all_classes.add(str(labels).lower())
+    known_classes = list(all_classes)
+    
     # After loading/defining known_classes and label_map for HAM10000:
     ham_class_list = ', '.join(sorted(known_classes))
     ham_prompts = [p.format(class_list=ham_class_list) for p in prompt_templates]
