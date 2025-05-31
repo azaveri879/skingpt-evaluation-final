@@ -323,24 +323,75 @@ def main():
 
     # --- Automation: Suggest new label_map candidates ---
     def suggest_label_map_candidates(unmatched_preds, known_classes, label_map, top_n=30):
+        # Common English words to filter out
+        stop_words = {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'about',
+            'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does',
+            'did', 'will', 'would', 'shall', 'should', 'may', 'might', 'must', 'can', 'could', 'of',
+            'from', 'up', 'down', 'out', 'over', 'under', 'again', 'further', 'then', 'once', 'here',
+            'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most',
+            'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too',
+            'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now', 'this', 'that', 'these',
+            'those', 'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+            'do', 'does', 'did', 'doing', 'would', 'should', 'could', 'ought', 'i', 'you', 'he', 'she',
+            'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'its', 'our',
+            'their', 'mine', 'yours', 'hers', 'ours', 'theirs', 'who', 'whom', 'whose', 'which', 'what',
+            'where', 'when', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other',
+            'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very',
+            's', 't', 'can', 'will', 'just', 'don', 'should', 'now', 'image', 'shows', 'appears',
+            'appears to', 'appears to be', 'to be', 'on the', 'the image', 'the lesion', 'image shows',
+            'shows a', 'the image shows', 'image shows a'
+        }
+        
+        # Medical/dermatological terms to look for
+        medical_terms = {
+            'lesion', 'skin', 'rash', 'spot', 'mark', 'patch', 'growth', 'tumor', 'cancer', 'carcinoma',
+            'melanoma', 'nevus', 'mole', 'keratosis', 'dermatitis', 'eczema', 'psoriasis', 'acne',
+            'wart', 'cyst', 'ulcer', 'blister', 'nodule', 'papule', 'plaque', 'scale', 'crust',
+            'erosion', 'fissure', 'scar', 'atrophy', 'lichenification', 'macule', 'vesicle', 'pustule',
+            'wheal', 'telangiectasia', 'purpura', 'petechiae', 'ecchymosis', 'angioma', 'hemangioma',
+            'fibroma', 'dermatofibroma', 'seborrheic', 'actinic', 'basal', 'squamous', 'malignant',
+            'benign', 'precancerous', 'dysplastic', 'atypical', 'inflammatory', 'infectious', 'fungal',
+            'bacterial', 'viral', 'allergic', 'autoimmune', 'congenital', 'hereditary', 'acquired'
+        }
+        
         # Tokenize predictions and count n-grams (1-3 words)
         from collections import Counter
-        import itertools
         ngram_counts = Counter()
         for pred in unmatched_preds:
             tokens = pred.lower().split()
-            for n in [1, 2, 3]:
-                for i in range(len(tokens) - n + 1):
-                    ngram = ' '.join(tokens[i:i+n])
-                    ngram_counts[ngram] += 1
+            # Look for medical terms and their context
+            for i, token in enumerate(tokens):
+                if token in medical_terms:
+                    # Add the medical term
+                    ngram_counts[token] += 1
+                    # Add 2-word phrases containing medical terms
+                    if i < len(tokens) - 1:
+                        ngram = f"{token} {tokens[i+1]}"
+                        if not all(word in stop_words for word in ngram.split()):
+                            ngram_counts[ngram] += 1
+                    # Add 3-word phrases containing medical terms
+                    if i < len(tokens) - 2:
+                        ngram = f"{token} {tokens[i+1]} {tokens[i+2]}"
+                        if not all(word in stop_words for word in ngram.split()):
+                            ngram_counts[ngram] += 1
+        
         # Exclude ngrams already in label_map or known_classes
-        exclude = set(label_map.keys()) | set(known_classes)
-        candidates = [(ngram, count) for ngram, count in ngram_counts.items() if ngram not in exclude and count > 1]
+        exclude = set(label_map.keys()) | set(known_classes) | stop_words
+        candidates = [(ngram, count) for ngram, count in ngram_counts.items() 
+                     if ngram not in exclude and count > 1]
         candidates.sort(key=lambda x: -x[1])
+        
         print("\nTop new mapping candidates from unmatched predictions:")
+        print("(Focusing on medical/dermatological terms and their context)")
         for ngram, count in candidates[:top_n]:
             print(f"  '{ngram}': '',  # seen {count} times")
         print("\nCopy any relevant ones into your label_map!")
+        
+        # Also show some example predictions that weren't matched
+        print("\nExample unmatched predictions:")
+        for pred in unmatched_preds[:5]:
+            print(f"  {pred[:100]}...")
 
     suggest_label_map_candidates(unmatched, known_classes, label_map)
 
