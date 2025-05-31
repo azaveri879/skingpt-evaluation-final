@@ -343,47 +343,91 @@ def main():
     scin_label_map = {
         # Inflammatory conditions
         'eczema': 'eczema',
+        'atopic': 'eczema',
         'dermatitis': 'acute dermatitis, nos',
         'allergic contact': 'allergic contact dermatitis',
         'irritant contact': 'irritant contact dermatitis',
         'seborrheic': 'seborrheic dermatitis',
+        'seborrheic eczema': 'seborrheic dermatitis',
         'psoriasis': 'psoriasis',
+        'psoriatic': 'psoriasis',
         'lichen planus': 'lichen planus/lichenoid eruption',
         'lichenoid': 'lichen planus/lichenoid eruption',
+        'lichen': 'lichen planus/lichenoid eruption',
+        'lichen simplex': 'lichen simplex chronicus',
+        'lichen nitidus': 'lichen nitidus',
+        'lichen planus': 'lichen planus/lichenoid eruption',
         
         # Infections
         'impetigo': 'impetigo',
         'tinea': 'tinea',
-        'fungal': 'tinea',
         'ringworm': 'tinea',
+        'fungal': 'tinea',
+        'dermatophyte': 'tinea',
         'molluscum': 'molluscum contagiosum',
+        'molluscum contagiosum': 'molluscum contagiosum',
         'scabies': 'scabies',
         'candida': 'candida',
+        'yeast': 'candida',
         'viral': 'viral exanthem',
+        'viral rash': 'viral exanthem',
+        'folliculitis': 'folliculitis',
+        'hair follicle': 'folliculitis',
+        'intertrigo': 'intertrigo',
+        'skin fold': 'intertrigo',
         
         # Vascular conditions
         'vasculitis': 'leukocytoclastic vasculitis',
         'purpuric': 'pigmented purpuric eruption',
         'petechiae': 'traumatic petechiae',
         'ecchymosis': 'o/e - ecchymoses present',
+        'bruise': 'o/e - ecchymoses present',
+        'erythema': 'erythema multiforme',
+        'erythema nodosum': 'erythema nodosum',
+        'nodular': 'erythema nodosum',
         
         # Other conditions
         'acne': 'acne',
+        'pimple': 'acne',
+        'comedone': 'acne',
         'rosacea': 'rosacea',
         'urticaria': 'urticaria',
         'hives': 'urticaria',
+        'wheal': 'urticaria',
         'granuloma': 'granuloma annulare',
+        'annulare': 'granuloma annulare',
         'insect bite': 'insect bite',
+        'bug bite': 'insect bite',
         'milia': 'milia',
         'kaposi': "kaposi's sarcoma of skin",
+        'sarcoma': "kaposi's sarcoma of skin",
         'hypersensitivity': 'hypersensitivity',
         'allergic': 'hypersensitivity',
+        'allergy': 'hypersensitivity',
         'foreign body': 'foreign body',
         'abrasion': 'abrasion, scrape, or scab',
         'scrape': 'abrasion, scrape, or scab',
         'scab': 'abrasion, scrape, or scab',
         'cut': 'abrasion, scrape, or scab',
-        'wound': 'abrasion, scrape, or scab'
+        'wound': 'abrasion, scrape, or scab',
+        'lupus': 'cutaneous lupus',
+        'discoid': 'cutaneous lupus',
+        'drug rash': 'drug rash',
+        'medication': 'drug rash',
+        'dermatitis herpetiformis': 'dermatitis herpetiformis',
+        'herpetiformis': 'dermatitis herpetiformis',
+        'flushing': 'flushing',
+        'redness': 'flushing',
+        'prurigo': 'prurigo nodularis',
+        'nodularis': 'prurigo nodularis',
+        'pityriasis': 'pityriasis rosea',
+        'rosea': 'pityriasis rosea',
+        'rubra pilaris': 'pityriasis rubra pilaris',
+        'xerosis': 'xerosis',
+        'dry skin': 'xerosis',
+        'parapsoriasis': 'parapsoriasis',
+        'mycobacterial': 'skin and soft tissue atypical mycobacterial infection',
+        'cellulitis': 'skin and soft tissue atypical mycobacterial infection'
     }
 
     def extract_scin_class(text):
@@ -398,22 +442,49 @@ def main():
         
         # Look for characteristic features
         features = {
-            'eczema': ['itchy', 'red', 'inflamed', 'dry', 'scaly'],
-            'dermatitis': ['inflamed', 'irritated', 'red', 'itchy'],
-            'psoriasis': ['silvery', 'scaly', 'thick', 'plaques'],
-            'impetigo': ['honey-colored', 'crust', 'blister', 'sore'],
-            'tinea': ['ring', 'circular', 'fungal', 'scaly'],
-            'scabies': ['burrow', 'tunnel', 'itchy', 'rash'],
-            'vasculitis': ['purple', 'red', 'spots', 'bruise'],
-            'acne': ['pimple', 'blackhead', 'whitehead', 'comedone'],
-            'rosacea': ['red', 'flushing', 'bumps', 'pustules'],
-            'urticaria': ['hive', 'wheal', 'itchy', 'raised']
+            'eczema': ['itchy', 'red', 'inflamed', 'dry', 'scaly', 'atopic'],
+            'dermatitis': ['inflamed', 'irritated', 'red', 'itchy', 'rash'],
+            'psoriasis': ['silvery', 'scaly', 'thick', 'plaques', 'psoriatic'],
+            'impetigo': ['honey-colored', 'crust', 'blister', 'sore', 'bacterial'],
+            'tinea': ['ring', 'circular', 'fungal', 'scaly', 'ringworm'],
+            'scabies': ['burrow', 'tunnel', 'itchy', 'rash', 'mite'],
+            'vasculitis': ['purple', 'red', 'spots', 'bruise', 'blood vessel'],
+            'acne': ['pimple', 'blackhead', 'whitehead', 'comedone', 'zit'],
+            'rosacea': ['red', 'flushing', 'bumps', 'pustules', 'facial'],
+            'urticaria': ['hive', 'wheal', 'itchy', 'raised', 'allergic'],
+            'lichen': ['white', 'lacy', 'pattern', 'flat', 'top'],
+            'molluscum': ['pearl', 'dome', 'umbilicated', 'viral', 'wart'],
+            'folliculitis': ['hair', 'follicle', 'pustule', 'infected', 'bacterial'],
+            'intertrigo': ['fold', 'moist', 'red', 'irritated', 'friction'],
+            'erythema': ['red', 'target', 'bullseye', 'multiforme', 'nodosum'],
+            'granuloma': ['ring', 'annular', 'raised', 'firm', 'nodule'],
+            'xerosis': ['dry', 'rough', 'scaly', 'cracked', 'dehydrated'],
+            'cellulitis': ['red', 'warm', 'swollen', 'tender', 'infection']
         }
         
         for class_name, feature_list in features.items():
             if any(feature in text for feature in feature_list):
                 if class_name in scin_label_map:
                     found_classes.add(scin_label_map[class_name])
+        
+        # Look for location-specific terms
+        locations = {
+            'face': ['acne', 'rosacea', 'seborrheic dermatitis'],
+            'scalp': ['seborrheic dermatitis', 'psoriasis', 'tinea'],
+            'trunk': ['tinea', 'pityriasis rosea', 'viral exanthem'],
+            'arm': ['eczema', 'lichen planus', 'granuloma annulare'],
+            'leg': ['stasis dermatitis', 'cellulitis', 'erythema nodosum'],
+            'hand': ['dyshidrotic eczema', 'tinea', 'contact dermatitis'],
+            'foot': ['tinea', 'contact dermatitis', 'dyshidrotic eczema'],
+            'groin': ['tinea', 'intertrigo', 'candida'],
+            'fold': ['intertrigo', 'candida', 'inverse psoriasis']
+        }
+        
+        for location, conditions in locations.items():
+            if location in text:
+                for condition in conditions:
+                    if condition in scin_label_map:
+                        found_classes.add(scin_label_map[condition])
         
         return list(found_classes) if found_classes else None
 
