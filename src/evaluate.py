@@ -265,43 +265,43 @@ def main():
     ham_df.to_csv(os.path.join(results_dir, "ham10000_results.csv"), index=False)
     print(f"Saved HAM10000 results to {os.path.join(results_dir, 'ham10000_results.csv')}")
     
-    # # Evaluate SCIN dataset
-    # print("\nEvaluating SCIN dataset...")
-    # scin_results = evaluator.evaluate_dataset(
-    #     os.path.join(os.path.dirname(current_dir), "data/scin"),
-    #     os.path.join(os.path.dirname(current_dir), "data/scin/scin_merged.csv"),
-    #     num_samples=100,
-    #     image_column='image_1_path',
-    #     label_column='dermatologist_skin_condition_on_label_name'
-    # )
+    # Evaluate SCIN dataset
+    print("\nEvaluating SCIN dataset...")
+    scin_results = evaluator.evaluate_dataset(
+        os.path.join(os.path.dirname(current_dir), "data/scin"),
+        os.path.join(os.path.dirname(current_dir), "data/scin/scin_merged.csv"),
+        num_samples=100,
+        image_column='image_1_path',
+        label_column='dermatologist_skin_condition_on_label_name'
+    )
     
-    # # Save SCIN results
-    # scin_df = pd.DataFrame(scin_results)
-    # scin_df['predicted_class'] = scin_df['prediction'].apply(extract_predicted_class)
-    # scin_df['true_classes'] = scin_df['true_label'].apply(extract_true_classes)
-    # scin_df['correct'] = scin_df.apply(is_correct, axis=1)
-    # accuracy = scin_df['correct'].mean()
-    # print(f"Adjusted Accuracy: {accuracy:.2%}")
-    # scin_df.to_csv(os.path.join(results_dir, "scin_results.csv"), index=False)
-    # print(f"Saved SCIN results to {os.path.join(results_dir, 'scin_results.csv')}")
+    # Save SCIN results
+    scin_df = pd.DataFrame(scin_results)
+    scin_df['predicted_class'] = scin_df['prediction'].apply(extract_predicted_class)
+    scin_df['true_classes'] = scin_df['true_label'].apply(extract_true_classes)
+    scin_df['correct'] = scin_df.apply(is_correct, axis=1)
+    accuracy = scin_df['correct'].mean()
+    print(f"Adjusted Accuracy: {accuracy:.2%}")
+    scin_df.to_csv(os.path.join(results_dir, "scin_results.csv"), index=False)
+    print(f"Saved SCIN results to {os.path.join(results_dir, 'scin_results.csv')}")
 
-    # # Apply classification report
-    # df_valid = scin_df[scin_df['predicted_class'].notnull() & (scin_df['true_classes'].apply(len) > 0)]
-    # df_valid['first_true_class'] = df_valid['true_classes'].apply(lambda s: list(s)[0] if s else None)
+    # Apply classification report
+    df_valid = scin_df[scin_df['predicted_class'].notnull() & (scin_df['true_classes'].apply(len) > 0)]
+    df_valid['first_true_class'] = df_valid['true_classes'].apply(lambda s: list(s)[0] if s else None)
 
-    # print(classification_report(df_valid['first_true_class'], df_valid['predicted_class']))
+    print(classification_report(df_valid['first_true_class'], df_valid['predicted_class']))
 
-    # # If you want to see SCIN known classes
-    # all_classes = set()
-    # for labels in scin_df['true_label']:
-    #     try:
-    #         for l in ast.literal_eval(labels):
-    #             all_classes.add(l.lower())
-    #     except:
-    #         pass
-    # known_classes = list(all_classes)
-    # print("SCIN known classes:", known_classes)
-    # print("Number of SCIN known classes:", len(known_classes))
+    # If you want to see SCIN known classes
+    all_classes = set()
+    for labels in scin_df['true_label']:
+        try:
+            for l in ast.literal_eval(labels):
+                all_classes.add(l.lower())
+        except:
+            pass
+    known_classes = list(all_classes)
+    print("SCIN known classes:", known_classes)
+    print("Number of SCIN known classes:", len(known_classes))
 
     all_classes = set()
     for labels in ham_df['true_classes']:
