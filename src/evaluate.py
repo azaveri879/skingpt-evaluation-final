@@ -436,18 +436,70 @@ def main():
     # Apply classification report
     df_valid = scin_df[scin_df['predicted_classes'].notnull() & (scin_df['true_classes'].apply(len) > 0)]
     
-    # Flatten predictions and true labels for classification report
-    all_preds = []
-    all_true = []
-    for _, row in df_valid.iterrows():
-        preds = row['predicted_classes']
-        trues = list(row['true_classes'])
-        if preds and trues:
-            all_preds.extend(preds)
-            all_true.extend(trues)
+    # Create a binary classification report for each class
+    all_classes = set()
+    for labels in scin_df['true_classes']:
+        all_classes.update(labels)
+    all_classes = sorted(list(all_classes))
     
-    print("\nClassification Report:")
-    print(classification_report(all_true, all_preds, zero_division=0))
+    # Initialize results dictionary
+    results = {cls: {'true_pos': 0, 'false_pos': 0, 'false_neg': 0} for cls in all_classes}
+    
+    # Calculate metrics for each class
+    for _, row in df_valid.iterrows():
+        preds = set(row['predicted_classes'])
+        trues = row['true_classes']
+        
+        for cls in all_classes:
+            if cls in preds and cls in trues:
+                results[cls]['true_pos'] += 1
+            elif cls in preds and cls not in trues:
+                results[cls]['false_pos'] += 1
+            elif cls not in preds and cls in trues:
+                results[cls]['false_neg'] += 1
+    
+    # Print detailed classification report
+    print("\nDetailed Classification Report:")
+    print(f"{'Class':<40} {'Precision':>10} {'Recall':>10} {'F1-Score':>10} {'Support':>10}")
+    print("-" * 82)
+    
+    total_true_pos = 0
+    total_false_pos = 0
+    total_false_neg = 0
+    
+    for cls in all_classes:
+        stats = results[cls]
+        true_pos = stats['true_pos']
+        false_pos = stats['false_pos']
+        false_neg = stats['false_neg']
+        
+        precision = true_pos / (true_pos + false_pos) if (true_pos + false_pos) > 0 else 0
+        recall = true_pos / (true_pos + false_neg) if (true_pos + false_neg) > 0 else 0
+        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+        support = true_pos + false_neg
+        
+        print(f"{cls:<40} {precision:>10.3f} {recall:>10.3f} {f1:>10.3f} {support:>10}")
+        
+        total_true_pos += true_pos
+        total_false_pos += false_pos
+        total_false_neg += false_neg
+    
+    # Print macro averages
+    macro_precision = sum(p['true_pos'] / (p['true_pos'] + p['false_pos']) if (p['true_pos'] + p['false_pos']) > 0 else 0 
+                         for p in results.values()) / len(results)
+    macro_recall = sum(p['true_pos'] / (p['true_pos'] + p['false_neg']) if (p['true_pos'] + p['false_neg']) > 0 else 0 
+                      for p in results.values()) / len(results)
+    macro_f1 = 2 * (macro_precision * macro_recall) / (macro_precision + macro_recall) if (macro_precision + macro_recall) > 0 else 0
+    
+    print("-" * 82)
+    print(f"{'macro avg':<40} {macro_precision:>10.3f} {macro_recall:>10.3f} {macro_f1:>10.3f} {total_true_pos + total_false_neg:>10}")
+    
+    # Print micro averages
+    micro_precision = total_true_pos / (total_true_pos + total_false_pos) if (total_true_pos + total_false_pos) > 0 else 0
+    micro_recall = total_true_pos / (total_true_pos + total_false_neg) if (total_true_pos + total_false_neg) > 0 else 0
+    micro_f1 = 2 * (micro_precision * micro_recall) / (micro_precision + micro_recall) if (micro_precision + micro_recall) > 0 else 0
+    
+    print(f"{'micro avg':<40} {micro_precision:>10.3f} {micro_recall:>10.3f} {micro_f1:>10.3f} {total_true_pos + total_false_neg:>10}")
 
     # Analyze unmatched SCIN predictions
     unmatched = scin_df[scin_df['predicted_classes'].isnull()]
